@@ -145,19 +145,24 @@ export const App: React.FC = () => {
           </div>
 
           <div className="field">
-            <span className="label">Category</span>
-            <div className="category-buttons">
+            <label className="label" htmlFor="category">
+              Category
+            </label>
+            <select
+              id="category"
+              className="select"
+              value={kind ?? ""}
+              onChange={(e) =>
+                setKind(e.target.value === "" ? null : Number(e.target.value))
+              }
+            >
+              <option value="">Select category</option>
               {CATEGORIES.map(({ id, label }) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`category-button ${kind === id ? "category-button--active" : ""}`}
-                  onClick={() => setKind(id)}
-                >
+                <option key={id} value={id}>
                   {label}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
           {error && <p className="form-error">{error}</p>}
