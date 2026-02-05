@@ -34,10 +34,12 @@ export const App: React.FC = () => {
   const [kind, setKind] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+   const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setSuccess(null);
     if (kind === null) {
       setError("Выберите категорию");
       return;
@@ -60,6 +62,7 @@ export const App: React.FC = () => {
         const text = await res.text();
         throw new Error(text || `Ошибка ${res.status}`);
       }
+      setSuccess("Сохранено в БД!");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка отправки");
     } finally {
@@ -166,6 +169,7 @@ export const App: React.FC = () => {
           </div>
 
           {error && <p className="form-error">{error}</p>}
+          {success && <p className="form-success">{success}</p>}
 
           <button
             className="submit-button"

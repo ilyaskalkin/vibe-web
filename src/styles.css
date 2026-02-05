@@ -130,6 +130,18 @@ body {
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4);
 }
 
+.form-error {
+  margin: 4px 0 0;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.form-success {
+  margin: 4px 0 0;
+  color: #15803d;
+  font-size: 14px;
+}
+
 @media (max-width: 480px) {
   .card {
     padding: 24px 20px 28px;
