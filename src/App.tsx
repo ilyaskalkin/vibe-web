@@ -7,6 +7,7 @@ const CATEGORIES = [
   { id: 4, label: "Прочее" },
   { id: 5, label: "Алкоголь" },
   { id: 6, label: "Регулярное" },
+  { id: 7, label: "Автомобиль" },
 ] as const;
 
 /** Operation schema: POST /api/operations/add (OpenAPI) */
