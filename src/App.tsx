@@ -104,7 +104,6 @@ export const App: React.FC = () => {
               id="amount"
               type="number"
               step="0.01"
-              min="0"
               className="input"
               placeholder="0.00"
               value={amount}
