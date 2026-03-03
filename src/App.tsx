@@ -63,7 +63,7 @@ export const App: React.FC = () => {
         const text = await res.text();
         throw new Error(text || `Ошибка ${res.status}`);
       }
-      setSuccess("Сохранено в БД!");
+      setSuccess(`«${description.trim() || "—"}» на сумму ${parseFloat(amount)} сохранено`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка отправки");
     } finally {
