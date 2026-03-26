@@ -10,7 +10,18 @@ const CATEGORIES = [
   { id: 7, label: "Автомобиль" },
 ] as const;
 
-/** Operation schema: POST /api/operations/add (OpenAPI) */
+const ACCOUNT_OPTIONS = [
+  { value: 1, label: "Cash" },
+  { value: 2, label: "Card" },
+  { value: 3, label: "Savings" },
+] as const;
+
+const ACCOUNT_LABELS: Record<number, string> = {
+  1: "Наличные",
+  2: "Карта",
+  3: "Накопления",
+};
+
 interface Operation {
   id?: number;
   date?: string;
@@ -21,13 +32,46 @@ interface Operation {
   storned?: boolean;
 }
 
-const ACCOUNT_OPTIONS = [
-  { value: 1, label: "Cash" },
-  { value: 2, label: "Card" },
-  { value: 3, label: "Savings" },
-] as const;
+/** Если дата — суббота или воскресенье, возвращает предыдущую пятницу */
+function effectiveDate(d: Date): Date {
+  const day = d.getDay();
+  const offset = day === 6 ? -1 : day === 0 ? -2 : 0;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset);
+}
 
-export const App: React.FC = () => {
+function defaultDates(): { from: string; to: string } {
+  const today = new Date();
+
+  // Начало: эффективное 5-е текущего месяца + 1 день
+  const fifth = new Date(today.getFullYear(), today.getMonth(), 5);
+  const effFifth = effectiveDate(fifth);
+  const start = new Date(effFifth.getFullYear(), effFifth.getMonth(), effFifth.getDate() + 1);
+
+  // Конец: эффективное 5-е следующего месяца
+  const nextFifth = new Date(today.getFullYear(), today.getMonth() + 1, 5);
+  const end = effectiveDate(nextFifth);
+
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: fmt(start), to: fmt(end) };
+}
+
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+function formatAmount(amount: number): string {
+  const sign = amount < 0 ? "−\u202f" : "";
+  return `${sign}${Math.abs(amount).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}\u00a0₽`;
+}
+
+// ── Форма добавления ─────────────────────────────────────────────────────────
+
+const AddForm: React.FC = () => {
   const [date, setDate] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -35,7 +79,7 @@ export const App: React.FC = () => {
   const [kind, setKind] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-   const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -63,7 +107,9 @@ export const App: React.FC = () => {
         const text = await res.text();
         throw new Error(text || `Ошибка ${res.status}`);
       }
-      setSuccess(`«${description.trim() || "—"}» на сумму ${parseFloat(amount)} сохранено`);
+      setSuccess(
+        `«${description.trim() || "—"}» на сумму ${parseFloat(amount)} сохранено`
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка отправки");
     } finally {
@@ -72,117 +118,265 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="page">
-      <div className="card">
-        <header className="card-header">
-          <h1 className="title">MVP Testing</h1>
-          <p className="subtitle">Enter transaction details below</p>
-        </header>
+    <form className="form" onSubmit={handleSubmit}>
+      <div className="field">
+        <label className="label" htmlFor="date">
+          Date
+        </label>
+        <div className="input-wrapper">
+          <input
+            id="date"
+            type="date"
+            className="input"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
+        </div>
+      </div>
 
-        <form className="form" onSubmit={handleSubmit}>
-          <div className="field">
-            <label className="label" htmlFor="date">
-              Date
-            </label>
-            <div className="input-wrapper">
-              <input
-                id="date"
-                type="date"
-                className="input"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
+      <div className="field">
+        <label className="label" htmlFor="amount">
+          Amount
+        </label>
+        <input
+          id="amount"
+          type="number"
+          step="0.01"
+          className="input"
+          placeholder="0.00"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="field">
+        <label className="label" htmlFor="description">
+          Description
+        </label>
+        <input
+          id="description"
+          type="text"
+          className="input"
+          placeholder="Enter description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+
+      <div className="field">
+        <label className="label" htmlFor="account">
+          Account
+        </label>
+        <select
+          id="account"
+          className="select"
+          value={account === "" ? "" : account}
+          onChange={(e) =>
+            setAccount(e.target.value === "" ? "" : Number(e.target.value))
+          }
+        >
+          <option value="">Select account</option>
+          {ACCOUNT_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="field">
+        <label className="label" htmlFor="category">
+          Category
+        </label>
+        <select
+          id="category"
+          className="select"
+          value={kind ?? ""}
+          onChange={(e) =>
+            setKind(e.target.value === "" ? null : Number(e.target.value))
+          }
+        >
+          <option value="">Select category</option>
+          {CATEGORIES.map(({ id, label }) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {error && <p className="form-error">{error}</p>}
+      {success && <p className="form-success">{success}</p>}
+
+      <button className="submit-button" type="submit" disabled={loading}>
+        {loading ? "Отправка…" : "Submit"}
+      </button>
+    </form>
+  );
+};
+
+// ── Отчёт ────────────────────────────────────────────────────────────────────
+
+const Report: React.FC = () => {
+  const defaults = defaultDates();
+  const [from, setFrom] = useState(defaults.from);
+  const [to, setTo] = useState(defaults.to);
+  const [kind, setKind] = useState<number | null>(null);
+  const [rows, setRows] = useState<Operation[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFind = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const body: Record<string, unknown> = { fromDate: from, toDate: to };
+      if (kind !== null) body.kind = kind;
+      const res = await fetch("/api/operations/find", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      const data: Operation[] = await res.json();
+      setRows(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const total = rows?.reduce((sum, r) => sum + r.amount, 0) ?? 0;
+
+  return (
+    <div className="report">
+      <div className="filter-row">
+        <div className="field">
+          <label className="label">С</label>
+          <input
+            type="date"
+            className="input"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label className="label">По</label>
+          <input
+            type="date"
+            className="input"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label className="label">Категория</label>
+          <select
+            className="select"
+            value={kind ?? ""}
+            onChange={(e) =>
+              setKind(e.target.value === "" ? null : Number(e.target.value))
+            }
+          >
+            <option value="">Все</option>
+            {CATEGORIES.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <button
+        className="submit-button"
+        onClick={handleFind}
+        disabled={loading}
+      >
+        {loading ? "Загрузка…" : "Показать"}
+      </button>
+
+      {error && <p className="form-error">{error}</p>}
+
+      {rows !== null && (
+        rows.length === 0 ? (
+          <p className="report-empty">Записей не найдено</p>
+        ) : (
+          <div className="table-wrapper">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>Сумма</th>
+                  <th>Счёт</th>
+                  <th>Описание</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td className="cell-date">
+                      {row.date ? formatDate(row.date) : "—"}
+                    </td>
+                    <td className={row.amount < 0 ? "amount-negative" : "amount-positive"}>
+                      {formatAmount(row.amount)}
+                    </td>
+                    <td>{row.account ? ACCOUNT_LABELS[row.account] : "—"}</td>
+                    <td className="cell-description">{row.description || "—"}</td>
+                    <td>
+                      <button className="row-action" title="Редактировать">
+                        →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="report-total">
+              Итого:{" "}
+              <span className={total < 0 ? "amount-negative" : "amount-positive"}>
+                {formatAmount(total)}
+              </span>
             </div>
           </div>
-
-          <div className="field">
-            <label className="label" htmlFor="amount">
-              Amount
-            </label>
-            <input
-              id="amount"
-              type="number"
-              step="0.01"
-              className="input"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="description">
-              Description
-            </label>
-            <input
-              id="description"
-              type="text"
-              className="input"
-              placeholder="Enter description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="account">
-              Account
-            </label>
-            <select
-              id="account"
-              className="select"
-              value={account === "" ? "" : account}
-              onChange={(e) =>
-                setAccount(e.target.value === "" ? "" : Number(e.target.value))
-              }
-            >
-              <option value="">Select account</option>
-              {ACCOUNT_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="category">
-              Category
-            </label>
-            <select
-              id="category"
-              className="select"
-              value={kind ?? ""}
-              onChange={(e) =>
-                setKind(e.target.value === "" ? null : Number(e.target.value))
-              }
-            >
-              <option value="">Select category</option>
-              {CATEGORIES.map(({ id, label }) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && <p className="form-error">{error}</p>}
-          {success && <p className="form-success">{success}</p>}
-
-          <button
-            className="submit-button"
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? "Отправка…" : "Submit"}
-          </button>
-        </form>
-      </div>
+        )
+      )}
     </div>
   );
 };
 
+// ── Корневой компонент ────────────────────────────────────────────────────────
 
+export const App: React.FC = () => {
+  const [tab, setTab] = useState<"add" | "report">("add");
 
+  return (
+    <div className="page">
+      <div className={`card${tab === "report" ? " card--wide" : ""}`}>
+        <header className="card-header">
+          <h1 className="title">MoneyCoach</h1>
+          <div className="tabs">
+            <button
+              className={`tab${tab === "add" ? " tab--active" : ""}`}
+              onClick={() => setTab("add")}
+            >
+              + Добавить
+            </button>
+            <button
+              className={`tab${tab === "report" ? " tab--active" : ""}`}
+              onClick={() => setTab("report")}
+            >
+              ≡ Отчёт
+            </button>
+          </div>
+        </header>
+
+        {tab === "add" ? <AddForm /> : <Report />}
+      </div>
+    </div>
+  );
+};

@@ -149,6 +149,156 @@ body {
   line-height: 1.5;
 }
 
+/* ── Вкладки ─────────────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.tab {
+  padding: 8px 22px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  color: #6b7280;
+  transition: background-color 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.tab:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.tab--active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+/* ── Широкая карточка для отчёта ────────────────────────────────────────── */
+
+.card--wide {
+  max-width: 720px;
+}
+
+/* ── Отчёт ───────────────────────────────────────────────────────────────── */
+
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.report-empty {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 15px;
+  padding: 32px 0;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.report-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.report-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.report-table tr:last-child td {
+  border-bottom: none;
+}
+
+.report-table tr:hover td {
+  background-color: #f9fafb;
+}
+
+.cell-date {
+  white-space: nowrap;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.cell-description {
+  color: #6b7280;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amount-negative {
+  color: #15803d;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.amount-positive {
+  color: #1d4ed8;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.row-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #d1d5db;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  line-height: 1;
+}
+
+.row-action:hover {
+  color: #111827;
+  background-color: #f3f4f6;
+}
+
+.report-total {
+  text-align: right;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 12px 12px 0;
+  border-top: 2px solid #e5e7eb;
+}
+
+/* ── Адаптив ─────────────────────────────────────────────────────────────── */
+
 @media (max-width: 480px) {
   .card {
     padding: 24px 20px 28px;
@@ -157,6 +307,10 @@ body {
 
   .title {
     font-size: 26px;
+  }
+
+  .filter-row {
+    grid-template-columns: 1fr;
   }
 }
 
