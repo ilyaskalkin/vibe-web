@@ -229,6 +229,7 @@ const Report: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [amountFrom, setAmountFrom] = useState<string>("");
   const [amountTo, setAmountTo] = useState<string>("");
+  const [includeStorned, setIncludeStorned] = useState(false);
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -245,7 +246,7 @@ const Report: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const body: Record<string, unknown> = { fromDate: from, toDate: to };
+      const body: Record<string, unknown> = { fromDate: from, toDate: to, includeStorned };
       if (kind !== null) body.kind = kind;
       const res = await fetch("/api/operations/find", {
         method: "POST",
@@ -259,6 +260,16 @@ const Report: React.FC = () => {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStorno = async (id: number) => {
+    try {
+      const res = await fetch(`/api/operations/${id}/storno`, { method: "PATCH" });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      setRows((prev) => prev ? prev.map((r) => r.id === id ? { ...r, storned: true } : r) : prev);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка сторнирования");
     }
   };
 
@@ -344,6 +355,16 @@ const Report: React.FC = () => {
             ))}
           </select>
         </div>
+        <div className="field field--checkbox">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={includeStorned}
+              onChange={(e) => setIncludeStorned(e.target.checked)}
+            />
+            Показывать сторнированные
+          </label>
+        </div>
       </div>
 
       <button
@@ -383,7 +404,7 @@ const Report: React.FC = () => {
               </thead>
               <tbody>
                 {sortedRows.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className={row.storned ? "row--storned" : ""}>
                     <td className="cell-date">
                       {row.date ? formatDate(row.date) : "—"}
                     </td>
@@ -392,7 +413,16 @@ const Report: React.FC = () => {
                     </td>
                     <td>{row.account ? ACCOUNT_LABELS[row.account] : "—"}</td>
                     <td className="cell-description">{row.description || "—"}</td>
-                    <td>
+                    <td className="cell-actions">
+                      {!row.storned && (
+                        <button
+                          className="row-action row-action--storno"
+                          title="Сторнировать"
+                          onClick={() => row.id !== undefined && handleStorno(row.id)}
+                        >
+                          ✕
+                        </button>
+                      )}
                       <button className="row-action" title="Редактировать">
                         →
                       </button>
