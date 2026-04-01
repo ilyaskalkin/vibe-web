@@ -227,7 +227,17 @@ const Report: React.FC = () => {
   const [rows, setRows] = useState<Operation[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (field: "date" | "amount") => {
+    if (sortField === field) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
 
   const handleFind = async () => {
     setError(null);
@@ -252,9 +262,11 @@ const Report: React.FC = () => {
 
   const sortedRows = rows
     ? [...rows].sort((a, b) => {
+        const dir = sortDir === "asc" ? 1 : -1;
+        if (sortField === "amount") return (a.amount - b.amount) * dir;
         const da = a.date ?? "";
         const db = b.date ?? "";
-        return sortDir === "asc" ? da.localeCompare(db) : db.localeCompare(da);
+        return da.localeCompare(db) * dir;
       })
     : null;
 
@@ -320,11 +332,16 @@ const Report: React.FC = () => {
                 <tr>
                   <th
                     style={{ cursor: "pointer", userSelect: "none" }}
-                    onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                    onClick={() => handleSort("date")}
                   >
-                    Дата {sortDir === "asc" ? "↑" : "↓"}
+                    Дата {sortField === "date" ? (sortDir === "asc" ? "↑" : "↓") : ""}
                   </th>
-                  <th>Сумма</th>
+                  <th
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                    onClick={() => handleSort("amount")}
+                  >
+                    Сумма {sortField === "amount" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
                   <th>Счёт</th>
                   <th>Описание</th>
                   <th></th>
