@@ -227,6 +227,7 @@ const Report: React.FC = () => {
   const [rows, setRows] = useState<Operation[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const handleFind = async () => {
     setError(null);
@@ -248,6 +249,14 @@ const Report: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const sortedRows = rows
+    ? [...rows].sort((a, b) => {
+        const da = a.date ?? "";
+        const db = b.date ?? "";
+        return sortDir === "asc" ? da.localeCompare(db) : db.localeCompare(da);
+      })
+    : null;
 
   const total = rows?.reduce((sum, r) => sum + r.amount, 0) ?? 0;
 
@@ -301,15 +310,20 @@ const Report: React.FC = () => {
 
       {error && <p className="form-error">{error}</p>}
 
-      {rows !== null && (
-        rows.length === 0 ? (
+      {sortedRows !== null && (
+        sortedRows.length === 0 ? (
           <p className="report-empty">Записей не найдено</p>
         ) : (
           <div className="table-wrapper">
             <table className="report-table">
               <thead>
                 <tr>
-                  <th>Дата</th>
+                  <th
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                    onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                  >
+                    Дата {sortDir === "asc" ? "↑" : "↓"}
+                  </th>
                   <th>Сумма</th>
                   <th>Счёт</th>
                   <th>Описание</th>
@@ -317,7 +331,7 @@ const Report: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id}>
                     <td className="cell-date">
                       {row.date ? formatDate(row.date) : "—"}
