@@ -69,14 +69,20 @@ function formatAmount(amount: number): string {
   })}\u00a0₽`;
 }
 
-// ── Форма добавления ─────────────────────────────────────────────────────────
+// ── Общая форма (добавление / редактирование) ────────────────────────────────
 
-const AddForm: React.FC = () => {
-  const [date, setDate] = useState<string>("");
-  const [amount, setAmount] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
-  const [account, setAccount] = useState<number | "">("");
-  const [kind, setKind] = useState<number | null>(null);
+interface OperationFormProps {
+  mode: "add" | "edit";
+  initial?: Operation;
+  onSuccess?: () => void;
+}
+
+const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSuccess }) => {
+  const [date, setDate] = useState<string>(initial?.date ?? "");
+  const [amount, setAmount] = useState<string>(initial?.amount != null ? String(initial.amount) : "");
+  const [description, setDescription] = useState<string>(initial?.description ?? "");
+  const [account, setAccount] = useState<number | "">(initial?.account ?? "");
+  const [kind, setKind] = useState<number | null>(initial?.kind ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -98,18 +104,34 @@ const AddForm: React.FC = () => {
         ...(description.trim() && { description: description.trim() }),
         ...(account !== "" && { account }),
       };
-      const res = await fetch("/api/operations/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (res.status !== 201) {
-        const text = await res.text();
-        throw new Error(text || `Ошибка ${res.status}`);
+
+      let res: Response;
+      if (mode === "edit" && initial?.id != null) {
+        res = await fetch(`/api/operations/${initial.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `Ошибка ${res.status}`);
+        }
+        setSuccess("Отредактировано");
+        onSuccess?.();
+      } else {
+        res = await fetch("/api/operations/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.status !== 201) {
+          const text = await res.text();
+          throw new Error(text || `Ошибка ${res.status}`);
+        }
+        setSuccess(
+          `«${description.trim() || "—"}» на сумму ${parseFloat(amount)} сохранено`
+        );
       }
-      setSuccess(
-        `«${description.trim() || "—"}» на сумму ${parseFloat(amount)} сохранено`
-      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка отправки");
     } finally {
@@ -211,15 +233,17 @@ const AddForm: React.FC = () => {
       {success && <p className="form-success">{success}</p>}
 
       <button className="submit-button" type="submit" disabled={loading}>
-        {loading ? "Отправка…" : "Submit"}
+        {loading ? "Отправка…" : mode === "edit" ? "Сохранить" : "Submit"}
       </button>
     </form>
   );
 };
 
+const AddForm: React.FC = () => <OperationForm mode="add" />;
+
 // ── Отчёт ────────────────────────────────────────────────────────────────────
 
-const Report: React.FC = () => {
+const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
   const defaults = defaultDates();
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -423,7 +447,7 @@ const Report: React.FC = () => {
                           ✕
                         </button>
                       )}
-                      <button className="row-action" title="Редактировать">
+                      <button className="row-action" title="Редактировать" onClick={() => onEdit(row)}>
                         →
                       </button>
                     </td>
@@ -447,30 +471,45 @@ const Report: React.FC = () => {
 // ── Корневой компонент ────────────────────────────────────────────────────────
 
 export const App: React.FC = () => {
-  const [tab, setTab] = useState<"add" | "report">("add");
+  const [tab, setTab] = useState<"add" | "report" | "edit">("add");
+  const [editingOp, setEditingOp] = useState<Operation | null>(null);
+
+  const handleEdit = (op: Operation) => {
+    setEditingOp(op);
+    setTab("edit");
+  };
 
   return (
     <div className="page">
       <div className={`card${tab === "report" ? " card--wide" : ""}`}>
         <header className="card-header">
           <h1 className="title">MoneyCoach</h1>
-          <div className="tabs">
-            <button
-              className={`tab${tab === "add" ? " tab--active" : ""}`}
-              onClick={() => setTab("add")}
-            >
-              + Добавить
-            </button>
-            <button
-              className={`tab${tab === "report" ? " tab--active" : ""}`}
-              onClick={() => setTab("report")}
-            >
-              ≡ Отчёт
-            </button>
-          </div>
+          {tab !== "edit" && (
+            <div className="tabs">
+              <button
+                className={`tab${tab === "add" ? " tab--active" : ""}`}
+                onClick={() => setTab("add")}
+              >
+                + Добавить
+              </button>
+              <button
+                className={`tab${tab === "report" ? " tab--active" : ""}`}
+                onClick={() => setTab("report")}
+              >
+                ≡ Отчёт
+              </button>
+            </div>
+          )}
         </header>
 
-        {tab === "add" ? <AddForm /> : <Report />}
+        {tab === "add" && <AddForm />}
+        {tab === "report" && <Report onEdit={handleEdit} />}
+        {tab === "edit" && editingOp && (
+          <>
+            <button className="back-button" onClick={() => setTab("report")}>← Назад</button>
+            <OperationForm mode="edit" initial={editingOp} onSuccess={() => setTab("report")} />
+          </>
+        )}
       </div>
     </div>
   );
