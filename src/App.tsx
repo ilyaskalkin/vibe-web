@@ -227,6 +227,8 @@ const Report: React.FC = () => {
   const [rows, setRows] = useState<Operation[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [amountFrom, setAmountFrom] = useState<string>("");
+  const [amountTo, setAmountTo] = useState<string>("");
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -260,8 +262,16 @@ const Report: React.FC = () => {
     }
   };
 
-  const sortedRows = rows
-    ? [...rows].sort((a, b) => {
+  const filteredRows = rows
+    ? rows.filter((r) => {
+        const af = amountFrom !== "" ? r.amount >= parseFloat(amountFrom) : true;
+        const at = amountTo !== "" ? r.amount <= parseFloat(amountTo) : true;
+        return af && at;
+      })
+    : null;
+
+  const sortedRows = filteredRows
+    ? [...filteredRows].sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
         if (sortField === "amount") return (a.amount - b.amount) * dir;
         const da = a.date ?? "";
@@ -270,11 +280,11 @@ const Report: React.FC = () => {
       })
     : null;
 
-  const total = rows?.reduce((sum, r) => sum + r.amount, 0) ?? 0;
+  const total = filteredRows?.reduce((sum, r) => sum + r.amount, 0) ?? 0;
 
   return (
     <div className="report">
-      <div className="filter-row">
+      <div className="filter-row filter-row--4">
         <div className="field">
           <label className="label">С</label>
           <input
@@ -293,6 +303,30 @@ const Report: React.FC = () => {
             onChange={(e) => setTo(e.target.value)}
           />
         </div>
+        <div className="field">
+          <label className="label">Сумма от</label>
+          <input
+            type="number"
+            step="0.01"
+            className="input"
+            placeholder="—"
+            value={amountFrom}
+            onChange={(e) => setAmountFrom(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label className="label">Сумма до</label>
+          <input
+            type="number"
+            step="0.01"
+            className="input"
+            placeholder="—"
+            value={amountTo}
+            onChange={(e) => setAmountTo(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="filter-row filter-row--1">
         <div className="field">
           <label className="label">Категория</label>
           <select

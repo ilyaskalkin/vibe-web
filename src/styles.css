@@ -198,8 +198,15 @@ body {
 
 .filter-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
+}
+
+.filter-row--4 {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.filter-row--1 {
+  grid-template-columns: 1fr 1fr;
 }
 
 .report-empty {
@@ -309,8 +316,9 @@ body {
     font-size: 26px;
   }
 
-  .filter-row {
-    grid-template-columns: 1fr;
+  .filter-row--4,
+  .filter-row--1 {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
