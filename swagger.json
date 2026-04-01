@@ -1,0 +1,193 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "paths": {
+    "/api/operations/find": {
+      "post": {
+        "tags": [
+          "operation-controller"
+        ],
+        "operationId": "find",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Operation"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/operations/add": {
+      "post": {
+        "tags": [
+          "operation-controller"
+        ],
+        "operationId": "add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Operation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health-controller"
+        ],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/operations/all": {
+      "get": {
+        "tags": [
+          "operation-controller"
+        ],
+        "operationId": "getAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Operation"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/operations/delete/{id}": {
+      "delete": {
+        "tags": [
+          "operation-controller"
+        ],
+        "operationId": "delete",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OperationSearchRequest": {
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "account": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "account": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "storned": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

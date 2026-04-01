@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const CATEGORIES = [
   { id: 1, label: "Еда" },
@@ -74,10 +74,10 @@ function formatAmount(amount: number): string {
 interface OperationFormProps {
   mode: "add" | "edit";
   initial?: Operation;
-  onSuccess?: () => void;
+  onSaved?: (op: Operation) => void;
 }
 
-const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSuccess }) => {
+const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved }) => {
   const [date, setDate] = useState<string>(initial?.date ?? "");
   const [amount, setAmount] = useState<string>(initial?.amount != null ? String(initial.amount) : "");
   const [description, setDescription] = useState<string>(initial?.description ?? "");
@@ -116,8 +116,9 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSuccess 
           const text = await res.text();
           throw new Error(text || `Ошибка ${res.status}`);
         }
+        const updated: Operation = await res.json();
         setSuccess("Отредактировано");
-        onSuccess?.();
+        onSaved?.(updated);
       } else {
         res = await fetch("/api/operations/add", {
           method: "POST",
@@ -243,7 +244,7 @@ const AddForm: React.FC = () => <OperationForm mode="add" />;
 
 // ── Отчёт ────────────────────────────────────────────────────────────────────
 
-const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
+const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation | null }> = ({ onEdit, updatedOp }) => {
   const defaults = defaultDates();
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -256,6 +257,12 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
   const [includeStorned, setIncludeStorned] = useState(false);
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  useEffect(() => {
+    if (updatedOp) {
+      setRows((prev) => prev ? prev.map((r) => r.id === updatedOp.id ? updatedOp : r) : prev);
+    }
+  }, [updatedOp]);
 
   const handleSort = (field: "date" | "amount") => {
     if (sortField === field) {
@@ -286,6 +293,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
       setLoading(false);
     }
   };
+
 
   const handleStorno = async (id: number) => {
     try {
@@ -326,7 +334,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
             type="date"
             className="input"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => { setFrom(e.target.value); setRows(null); }}
           />
         </div>
         <div className="field">
@@ -335,7 +343,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
             type="date"
             className="input"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => { setTo(e.target.value); setRows(null); }}
           />
         </div>
         <div className="field">
@@ -367,9 +375,10 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
           <select
             className="select"
             value={kind ?? ""}
-            onChange={(e) =>
-              setKind(e.target.value === "" ? null : Number(e.target.value))
-            }
+            onChange={(e) => {
+              setKind(e.target.value === "" ? null : Number(e.target.value));
+              setRows(null);
+            }}
           >
             <option value="">Все</option>
             {CATEGORIES.map(({ id, label }) => (
@@ -384,7 +393,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
             <input
               type="checkbox"
               checked={includeStorned}
-              onChange={(e) => setIncludeStorned(e.target.checked)}
+              onChange={(e) => { setIncludeStorned(e.target.checked); setRows(null); }}
             />
             Показывать сторнированные
           </label>
@@ -473,9 +482,11 @@ const Report: React.FC<{ onEdit: (op: Operation) => void }> = ({ onEdit }) => {
 export const App: React.FC = () => {
   const [tab, setTab] = useState<"add" | "report" | "edit">("add");
   const [editingOp, setEditingOp] = useState<Operation | null>(null);
+  const [updatedOp, setUpdatedOp] = useState<Operation | null>(null);
 
   const handleEdit = (op: Operation) => {
     setEditingOp(op);
+    setUpdatedOp(null);
     setTab("edit");
   };
 
@@ -503,11 +514,13 @@ export const App: React.FC = () => {
         </header>
 
         {tab === "add" && <AddForm />}
-        {tab === "report" && <Report onEdit={handleEdit} />}
+        <div style={{ display: tab === "report" ? undefined : "none" }}>
+          <Report onEdit={handleEdit} updatedOp={updatedOp} />
+        </div>
         {tab === "edit" && editingOp && (
           <>
             <button className="back-button" onClick={() => setTab("report")}>← Назад</button>
-            <OperationForm mode="edit" initial={editingOp} onSuccess={() => setTab("report")} />
+            <OperationForm mode="edit" initial={editingOp} onSaved={setUpdatedOp} />
           </>
         )}
       </div>
