@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Fuse from "fuse.js";
 
 const CATEGORIES = [
   { id: 1, label: "Еда" },
@@ -257,6 +258,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
   const [includeStorned, setIncludeStorned] = useState(false);
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (updatedOp) {
@@ -313,8 +315,14 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
       })
     : null;
 
-  const sortedRows = filteredRows
-    ? [...filteredRows].sort((a, b) => {
+  const searchedRows = searchQuery.trim() && filteredRows
+    ? new Fuse(filteredRows, { keys: ["description"], threshold: 0.4, ignoreLocation: true })
+        .search(searchQuery)
+        .map((r) => r.item)
+    : filteredRows;
+
+  const sortedRows = searchedRows
+    ? [...searchedRows].sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
         if (sortField === "amount") return (a.amount - b.amount) * dir;
         const da = a.date ?? "";
@@ -323,7 +331,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
       })
     : null;
 
-  const total = filteredRows?.reduce((sum, r) => sum + r.amount, 0) ?? 0;
+  const total = searchedRows?.reduce((sum, r) => sum + r.amount, 0) ?? 0;
 
   return (
     <div className="report">
@@ -398,6 +406,17 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
             Показывать сторнированные
           </label>
         </div>
+      </div>
+
+      <div className="field">
+        <label className="label">Поиск по описанию</label>
+        <input
+          type="text"
+          className="input"
+          placeholder="Начните вводить…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
 
       <button
