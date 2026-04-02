@@ -76,13 +76,14 @@ interface OperationFormProps {
   mode: "add" | "edit";
   initial?: Operation;
   onSaved?: (op: Operation) => void;
+  lockAccount?: boolean;
 }
 
-const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved }) => {
+const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved, lockAccount }) => {
   const [date, setDate] = useState<string>(initial?.date ?? "");
   const [amount, setAmount] = useState<string>(initial?.amount != null ? String(initial.amount) : "");
   const [description, setDescription] = useState<string>(initial?.description ?? "");
-  const [account, setAccount] = useState<number | "">(initial?.account ?? "");
+  const [account, setAccount] = useState<number | "">(lockAccount ? 2 : (initial?.account ?? ""));
   const [kind, setKind] = useState<number | null>(initial?.kind ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,6 +198,7 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved })
           id="account"
           className="select"
           value={account === "" ? "" : account}
+          disabled={lockAccount}
           onChange={(e) =>
             setAccount(e.target.value === "" ? "" : Number(e.target.value))
           }
@@ -235,13 +237,136 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved })
       {success && <p className="form-success">{success}</p>}
 
       <button className="submit-button" type="submit" disabled={loading}>
-        {loading ? "Отправка…" : mode === "edit" ? "Сохранить" : "Submit"}
+        {loading ? "Отправка…" : mode === "edit" ? "Сохранить" : "Записать"}
       </button>
     </form>
   );
 };
 
-const AddForm: React.FC = () => <OperationForm mode="add" />;
+const AddForm: React.FC<{ prefill?: Partial<Operation> }> = ({ prefill }) => (
+  <OperationForm mode="add" initial={prefill as Operation | undefined} />
+);
+
+// ── Скан ─────────────────────────────────────────────────────────────────────
+
+interface ParsedTransaction {
+  description: string;
+  amount: number;
+  date: string;
+}
+
+const ScanTab: React.FC = () => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ParsedTransaction | null>(null);
+  const [formKey, setFormKey] = useState(0);
+
+  const loadFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setImageFile(file);
+    setImageUrl(URL.createObjectURL(file));
+    setTransactions(null);
+    setSelected(null);
+    setError(null);
+  };
+
+  const handleParse = async () => {
+    if (!imageFile) return;
+    setParsing(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("image", imageFile);
+      const res = await fetch("/gigachat/parse", { method: "POST", body: fd });
+      let data: { transactions?: ParsedTransaction[]; error?: string };
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Пустой ответ от сервера (${res.status}). Убедитесь что прокси-сервер запущен.`);
+      }
+      if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`);
+      setTransactions(data.transactions ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка парсинга");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleSelect = (t: ParsedTransaction) => {
+    setSelected(t);
+    setFormKey((k) => k + 1);
+  };
+
+  return (
+    <div className="scan">
+      <div className="scan-left">
+        <div
+          className={`drop-zone${dragging ? " drop-zone--active" : ""}${imageUrl ? " drop-zone--filled" : ""}`}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) loadFile(f); }}
+          onClick={() => !imageUrl && document.getElementById("scan-file-input")?.click()}
+        >
+          {imageUrl
+            ? <img src={imageUrl} className="scan-image" alt="скриншот" />
+            : <p className="drop-zone-hint">Перетащите скриншот сюда<br />или кликните для выбора</p>
+          }
+        </div>
+        <input
+          id="scan-file-input"
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f); }}
+        />
+        <button className="submit-button" onClick={handleParse} disabled={parsing || !imageUrl}>
+          {parsing ? "Анализ…" : "Начать анализ"}
+        </button>
+        {error && <p className="form-error">{error}</p>}
+      </div>
+
+      <div className="scan-right">
+        {transactions !== null && (
+          <>
+            {transactions.length === 0
+              ? <p className="report-empty">Операции не найдены</p>
+              : (
+                <ul className="scan-transactions">
+                  {transactions.map((t, i) => (
+                    <li
+                      key={i}
+                      className={`scan-transaction${selected === t ? " scan-transaction--active" : ""}`}
+                      onClick={() => handleSelect(t)}
+                    >
+                      <span className="scan-tr-date">{formatDate(t.date)}</span>
+                      <span className="scan-tr-desc">{t.description}</span>
+                      <span className="scan-tr-amount amount-positive">{formatAmount(t.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
+            <div className="scan-divider" />
+          </>
+        )}
+        <OperationForm
+          key={formKey}
+          mode="add"
+          lockAccount
+          initial={selected
+            ? { amount: selected.amount, description: selected.description, date: selected.date, kind: 0 } as Operation
+            : undefined
+          }
+        />
+      </div>
+    </div>
+  );
+};
 
 // ── Отчёт ────────────────────────────────────────────────────────────────────
 
@@ -512,9 +637,11 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
 // ── Корневой компонент ────────────────────────────────────────────────────────
 
 export const App: React.FC = () => {
-  const [tab, setTab] = useState<"add" | "report" | "edit">("add");
+  const [tab, setTab] = useState<"add" | "report" | "edit" | "scan">("add");
   const [editingOp, setEditingOp] = useState<Operation | null>(null);
   const [updatedOp, setUpdatedOp] = useState<Operation | null>(null);
+  const [prefillOp] = useState<Partial<Operation> | undefined>(undefined);
+  const [prefillKey] = useState(0);
 
   const handleEdit = (op: Operation) => {
     setEditingOp(op);
@@ -524,7 +651,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="page">
-      <div className={`card${tab === "report" ? " card--wide" : ""}`}>
+      <div className={`card${tab === "report" || tab === "scan" ? " card--wide" : ""}`}>
         <header className="card-header">
           <h1 className="title">MoneyCoach</h1>
           {tab !== "edit" && (
@@ -541,11 +668,17 @@ export const App: React.FC = () => {
               >
                 ≡ Отчёт
               </button>
+              <button
+                className={`tab${tab === "scan" ? " tab--active" : ""}`}
+                onClick={() => setTab("scan")}
+              >
+                📷 Скан
+              </button>
             </div>
           )}
         </header>
 
-        {tab === "add" && <AddForm />}
+        {tab === "add" && <AddForm key={prefillKey} prefill={prefillOp} />}
         <div style={{ display: tab === "report" ? undefined : "none" }}>
           <Report onEdit={handleEdit} updatedOp={updatedOp} />
         </div>
@@ -555,6 +688,7 @@ export const App: React.FC = () => {
             <OperationForm mode="edit" initial={editingOp} onSaved={setUpdatedOp} />
           </>
         )}
+        {tab === "scan" && <ScanTab />}
       </div>
     </div>
   );
