@@ -295,18 +295,20 @@ const AddForm: React.FC<{ prefill?: Partial<Operation> }> = ({ prefill }) => (
 
 const CATEGORY_MEMORY_KEY = "moneycoach_category_memory";
 
-function loadCategoryMemory(): Record<string, number> {
+interface CategoryMemoryEntry { kind: number; description: string; }
+
+function loadCategoryMemory(): Record<string, CategoryMemoryEntry> {
   try { return JSON.parse(localStorage.getItem(CATEGORY_MEMORY_KEY) ?? "{}"); }
   catch { return {}; }
 }
 
-function saveCategoryAssociation(description: string, kind: number) {
+function saveCategoryAssociation(originalDescription: string, kind: number, description: string) {
   const memory = loadCategoryMemory();
-  memory[description.toLowerCase().trim()] = kind;
+  memory[originalDescription.toLowerCase().trim()] = { kind, description };
   localStorage.setItem(CATEGORY_MEMORY_KEY, JSON.stringify(memory));
 }
 
-function lookupCategory(description: string): number | null {
+function lookupMemory(description: string): CategoryMemoryEntry | null {
   const memory = loadCategoryMemory();
   return memory[description.toLowerCase().trim()] ?? null;
 }
@@ -377,7 +379,7 @@ const ScanTab: React.FC = () => {
       setSavedIndices((prev) => new Set(prev).add(selectedIndex));
     }
     if (selected && op.kind) {
-      saveCategoryAssociation(selected.description, op.kind);
+      saveCategoryAssociation(selected.description, op.kind, op.description ?? selected.description);
     }
   };
 
@@ -439,7 +441,7 @@ const ScanTab: React.FC = () => {
           lockAccount
           onSaved={handleSaved}
           initial={selected
-            ? { amount: selected.amount, description: selected.description, date: selected.date, kind: lookupCategory(selected.description) ?? 0 } as Operation
+            ? { amount: selected.amount, description: lookupMemory(selected.description)?.description ?? selected.description, date: selected.date, kind: lookupMemory(selected.description)?.kind ?? 0 } as Operation
             : undefined
           }
         />
