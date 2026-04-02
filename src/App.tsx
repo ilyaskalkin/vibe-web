@@ -259,6 +259,7 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
+  const [fuzzySearch, setFuzzySearch] = useState(true);
 
   useEffect(() => {
     if (updatedOp) {
@@ -316,9 +317,13 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
     : null;
 
   const searchedRows = searchQuery.trim() && filteredRows
-    ? new Fuse(filteredRows, { keys: ["description"], threshold: 0.4, ignoreLocation: true })
-        .search(searchQuery)
-        .map((r) => r.item)
+    ? fuzzySearch
+      ? new Fuse(filteredRows, { keys: ["description"], threshold: 0.4, ignoreLocation: true })
+          .search(searchQuery)
+          .map((r) => r.item)
+      : filteredRows.filter((r) =>
+          r.description?.toLowerCase().includes(searchQuery.trim().toLowerCase())
+        )
     : filteredRows;
 
   const sortedRows = searchedRows
@@ -417,6 +422,14 @@ const Report: React.FC<{ onEdit: (op: Operation) => void; updatedOp?: Operation 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+        <label className="checkbox-label" style={{ paddingTop: 0 }}>
+          <input
+            type="checkbox"
+            checked={fuzzySearch}
+            onChange={(e) => setFuzzySearch(e.target.checked)}
+          />
+          Нечёткий поиск
+        </label>
       </div>
 
       <button
