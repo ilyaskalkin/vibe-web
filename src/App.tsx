@@ -88,25 +88,11 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved, l
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [pendingBody, setPendingBody] = useState<Operation | null>(null);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setSuccess(null);
-    if (kind === null) {
-      setError("Выберите категорию");
-      return;
-    }
+  const doSave = async (body: Operation) => {
     setLoading(true);
     try {
-      const body: Operation = {
-        amount: parseFloat(amount),
-        kind,
-        ...(date && { date }),
-        ...(description.trim() && { description: description.trim() }),
-        ...(account !== "" && { account }),
-      };
-
       let res: Response;
       if (mode === "edit" && initial?.id != null) {
         res = await fetch(`/api/operations/${initial.id}`, {
@@ -131,9 +117,9 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved, l
           const text = await res.text();
           throw new Error(text || `Ошибка ${res.status}`);
         }
-        setSuccess(
-          `«${description.trim() || "—"}» на сумму ${parseFloat(amount)} сохранено`
-        );
+        const added: Operation = await res.json();
+        setSuccess(`«${body.description || "—"}» на сумму ${body.amount} сохранено`);
+        onSaved?.(added);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка отправки");
@@ -142,7 +128,64 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved, l
     }
   };
 
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+    if (kind === null) {
+      setError("Выберите категорию");
+      return;
+    }
+
+    const body: Operation = {
+      amount: parseFloat(amount),
+      kind,
+      ...(date && { date }),
+      ...(description.trim() && { description: description.trim() }),
+      ...(account !== "" && { account }),
+    };
+
+    // Проверка дублей только при добавлении
+    if (mode === "add" && date && description.trim()) {
+      setLoading(true);
+      try {
+        const checkRes = await fetch("/api/operations/find", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fromDate: date, toDate: date, description: description.trim() }),
+        });
+        if (checkRes.ok) {
+          const existing: Operation[] = await checkRes.json();
+          const duplicate = existing.find((op) => op.amount === parseFloat(amount) && !op.storned);
+          if (duplicate) {
+            setLoading(false);
+            setPendingBody(body);
+            return;
+          }
+        }
+      } catch {
+        // если проверка упала — не блокируем сохранение
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    await doSave(body);
+  };
+
   return (
+    <>
+    {pendingBody && (
+      <div className="modal-overlay">
+        <div className="modal">
+          <p className="modal-text">Такая запись уже есть. Сохранить повторно?</p>
+          <div className="modal-actions">
+            <button className="modal-btn modal-btn--confirm" onClick={() => { setPendingBody(null); doSave(pendingBody); }}>Да</button>
+            <button className="modal-btn modal-btn--cancel" onClick={() => setPendingBody(null)}>Нет</button>
+          </div>
+        </div>
+      </div>
+    )}
     <form className="form" onSubmit={handleSubmit}>
       <div className="field">
         <label className="label" htmlFor="date">
@@ -240,12 +283,33 @@ const OperationForm: React.FC<OperationFormProps> = ({ mode, initial, onSaved, l
         {loading ? "Отправка…" : mode === "edit" ? "Сохранить" : "Записать"}
       </button>
     </form>
+    </>
   );
 };
 
 const AddForm: React.FC<{ prefill?: Partial<Operation> }> = ({ prefill }) => (
   <OperationForm mode="add" initial={prefill as Operation | undefined} />
 );
+
+// ── Память категорий ─────────────────────────────────────────────────────────
+
+const CATEGORY_MEMORY_KEY = "moneycoach_category_memory";
+
+function loadCategoryMemory(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(CATEGORY_MEMORY_KEY) ?? "{}"); }
+  catch { return {}; }
+}
+
+function saveCategoryAssociation(description: string, kind: number) {
+  const memory = loadCategoryMemory();
+  memory[description.toLowerCase().trim()] = kind;
+  localStorage.setItem(CATEGORY_MEMORY_KEY, JSON.stringify(memory));
+}
+
+function lookupCategory(description: string): number | null {
+  const memory = loadCategoryMemory();
+  return memory[description.toLowerCase().trim()] ?? null;
+}
 
 // ── Скан ─────────────────────────────────────────────────────────────────────
 
@@ -263,7 +327,9 @@ const ScanTab: React.FC = () => {
   const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ParsedTransaction | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
 
   const loadFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -271,6 +337,8 @@ const ScanTab: React.FC = () => {
     setImageUrl(URL.createObjectURL(file));
     setTransactions(null);
     setSelected(null);
+    setSelectedIndex(null);
+    setSavedIndices(new Set());
     setError(null);
   };
 
@@ -297,9 +365,20 @@ const ScanTab: React.FC = () => {
     }
   };
 
-  const handleSelect = (t: ParsedTransaction) => {
+  const handleSelect = (t: ParsedTransaction, i: number) => {
+    if (savedIndices.has(i)) return;
     setSelected(t);
+    setSelectedIndex(i);
     setFormKey((k) => k + 1);
+  };
+
+  const handleSaved = (op: Operation) => {
+    if (selectedIndex !== null) {
+      setSavedIndices((prev) => new Set(prev).add(selectedIndex));
+    }
+    if (selected && op.kind) {
+      saveCategoryAssociation(selected.description, op.kind);
+    }
   };
 
   return (
@@ -310,7 +389,7 @@ const ScanTab: React.FC = () => {
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) loadFile(f); }}
-          onClick={() => !imageUrl && document.getElementById("scan-file-input")?.click()}
+          onClick={() => document.getElementById("scan-file-input")?.click()}
         >
           {imageUrl
             ? <img src={imageUrl} className="scan-image" alt="скриншот" />
@@ -340,8 +419,8 @@ const ScanTab: React.FC = () => {
                   {transactions.map((t, i) => (
                     <li
                       key={i}
-                      className={`scan-transaction${selected === t ? " scan-transaction--active" : ""}`}
-                      onClick={() => handleSelect(t)}
+                      className={`scan-transaction${selectedIndex === i ? " scan-transaction--active" : ""}${savedIndices.has(i) ? " scan-transaction--saved" : ""}`}
+                      onClick={() => handleSelect(t, i)}
                     >
                       <span className="scan-tr-date">{formatDate(t.date)}</span>
                       <span className="scan-tr-desc">{t.description}</span>
@@ -358,8 +437,9 @@ const ScanTab: React.FC = () => {
           key={formKey}
           mode="add"
           lockAccount
+          onSaved={handleSaved}
           initial={selected
-            ? { amount: selected.amount, description: selected.description, date: selected.date, kind: 0 } as Operation
+            ? { amount: selected.amount, description: selected.description, date: selected.date, kind: lookupCategory(selected.description) ?? 0 } as Operation
             : undefined
           }
         />

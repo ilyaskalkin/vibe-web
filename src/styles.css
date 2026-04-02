@@ -369,6 +369,68 @@ body {
   color: #111827;
 }
 
+/* ── Модалка ─────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 28px 32px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  max-width: 360px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  color: #111827;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.modal-btn:hover {
+  opacity: 0.85;
+}
+
+.modal-btn--confirm {
+  background-color: #111827;
+  color: #ffffff;
+}
+
+.modal-btn--cancel {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
 /* ── Скан ────────────────────────────────────────────────────────────────── */
 
 .scan {
@@ -410,7 +472,7 @@ body {
 
 .drop-zone--filled {
   border-style: solid;
-  cursor: default;
+  cursor: pointer;
   min-height: unset;
 }
 
@@ -481,6 +543,17 @@ body {
 .scan-transaction--active {
   border-color: #111827;
   background-color: #f3f4f6;
+}
+
+.scan-transaction--saved {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: line-through;
+}
+
+.scan-transaction--saved:hover {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
 }
 
 .scan-divider {
